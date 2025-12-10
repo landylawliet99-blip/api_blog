@@ -1,4 +1,4 @@
-// models/articleModel.js - VERSIÓN COMPLETA (CRUD)
+// models/articleModel.js - VERSIÓN COMPLETA CON MÉTODO getPublished()
 const supabase = require('../config/supabaseClient');
 
 const Article = {
@@ -12,7 +12,6 @@ const Article = {
       .from('articles')
       .insert([{
         ...articleData,
-        // Aseguramos que tenga una fecha de creación/actualización
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
@@ -36,7 +35,6 @@ const Article = {
       .from('articles')
       .select('*');
 
-    // Orden por defecto: los más nuevos primero
     query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
@@ -62,8 +60,7 @@ const Article = {
 
     if (error) {
       console.error('[Article Model] Error en getById:', error);
-      // Distinguir entre "no encontrado" y otros errores
-      if (error.code === 'PGRST116') { // Código de Supabase para "no encontrado"
+      if (error.code === 'PGRST116') {
         throw new Error(`Artículo con ID "${id}" no encontrado.`);
       }
       throw new Error(`Error al obtener el artículo: ${error.message}`);
@@ -94,13 +91,30 @@ const Article = {
   },
 
   /**
+   * OBTENER ARTÍCULOS PUBLICADOS (para la página principal pública)
+   * @returns {Promise<Array>} Lista de artículos con estado 'published'
+   */
+  async getPublished() {
+    const { data, error } = await supabase
+      .from('articles')
+      .select('id, title, slug, excerpt, cover_image_url, created_at, updated_at, status')
+      .eq('status', 'published')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[Article Model] Error en getPublished:', error);
+      throw new Error(`No se pudieron obtener artículos publicados: ${error.message}`);
+    }
+    return data;
+  },
+
+  /**
    * ACTUALIZAR - Modifica un artículo existente.
    * @param {string} id - UUID del artículo a actualizar
    * @param {Object} updates - Campos a modificar {title, content, status, ...}
    * @returns {Promise<Object>} El artículo actualizado
    */
   async update(id, updates) {
-    // Añade la fecha de actualización automáticamente
     const dataToUpdate = {
       ...updates,
       updated_at: new Date().toISOString()
@@ -153,7 +167,7 @@ const Article = {
    * @param {string} slug - Slug del artículo publicado
    * @returns {Promise<Object>} Artículo con sus productos y enlaces de afiliado
    */
-   async getWithProducts(slug) {
+  async getWithProducts(slug) {
     const { data, error } = await supabase
       .from('articles')
       .select(`
@@ -195,5 +209,4 @@ const Article = {
   }
 };
 
-// Exporta el objeto Article para usarlo en los controladores
 module.exports = Article;
