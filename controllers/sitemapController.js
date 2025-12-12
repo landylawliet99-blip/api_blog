@@ -3,7 +3,8 @@ const supabase = require('../config/supabaseClient');
 const { create } = require('xmlbuilder2');
 
 // Configuración del dominio - PARA DESARROLLO LOCAL
-const DOMAIN = 'http://localhost:3000'; 
+const DOMAIN = 'https://blog-laptops-gaming.onrender.com';
+
 
 const sitemapController = {
   async generateSitemap(req, res) {
