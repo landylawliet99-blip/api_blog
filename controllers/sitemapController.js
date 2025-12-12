@@ -1,6 +1,9 @@
-// backend/controllers/sitemapController.js
+// backend/controllers/sitemapController.js 
 const supabase = require('../config/supabaseClient');
 const { create } = require('xmlbuilder2');
+
+// Configuración del dominio - PARA DESARROLLO LOCAL
+const DOMAIN = 'http://localhost:3000'; 
 
 const sitemapController = {
   async generateSitemap(req, res) {
@@ -16,20 +19,23 @@ const sitemapController = {
       const root = create({ version: '1.0', encoding: 'UTF-8' })
         .ele('urlset', { xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9' });
 
+      // URL principal (home)
       root.ele('url')
-        .ele('loc').txt('https://tudominio.com/').up()
+        .ele('loc').txt(`${DOMAIN}/`).up()
         .ele('lastmod').txt(new Date().toISOString().split('T')[0]).up()
         .ele('changefreq').txt('daily').up()
         .ele('priority').txt('1.0').up();
 
+      // URLs de artículos
       articles.forEach(article => {
         root.ele('url')
-          .ele('loc').txt(`https://tudominio.com/blog/${article.slug}`).up()
+          .ele('loc').txt(`${DOMAIN}/blog/${article.slug}`).up()
           .ele('lastmod').txt(new Date(article.updated_at).toISOString().split('T')[0]).up()
           .ele('changefreq').txt('weekly').up()
           .ele('priority').txt('0.8').up();
       });
 
+      // URLs de productos (opcional)
       const { data: products } = await supabase
         .from('products')
         .select('id, updated_at');
@@ -37,7 +43,7 @@ const sitemapController = {
       if (products) {
         products.forEach(product => {
           root.ele('url')
-            .ele('loc').txt(`https://tudominio.com/product/${product.id}`).up()
+            .ele('loc').txt(`${DOMAIN}/product/${product.id}`).up()
             .ele('lastmod').txt(new Date(product.updated_at).toISOString().split('T')[0]).up()
             .ele('changefreq').txt('monthly').up()
             .ele('priority').txt('0.6').up();
@@ -63,7 +69,7 @@ Disallow: /admin/
 Disallow: /login/
 Disallow: /api/
 
-Sitemap: https://tudominio.com/api/sitemap.xml
+Sitemap: ${DOMAIN === 'http://localhost:3000' ? 'http://localhost:3001' : DOMAIN}/api/sitemap.xml
 
 User-agent: GPTBot
 Disallow: /
@@ -83,18 +89,18 @@ Disallow: /`;
       "name": "Laptops Gaming Blog",
       "short_name": "LaptopsGaming",
       "description": "Reviews y análisis de laptops gaming",
-      "start_url": "/",
+      "start_url": `${DOMAIN}/`,
       "display": "standalone",
       "background_color": "#1a1a1a",
       "theme_color": "#ff6b00",
       "icons": [
         {
-          "src": "/icon-192x192.png",
+          "src": `${DOMAIN}/icon-192x192.png`,
           "sizes": "192x192",
           "type": "image/png"
         },
         {
-          "src": "/icon-512x512.png",
+          "src": `${DOMAIN}/icon-512x512.png`,
           "sizes": "512x512",
           "type": "image/png"
         }

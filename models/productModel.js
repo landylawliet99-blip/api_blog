@@ -1,4 +1,4 @@
-// models/productModel.js - VERSIÓN COMPLETA CON GESTIÓN DE ENLACES
+// models/productModel.js 
 const supabase = require('../config/supabaseClient');
 
 const Product = {
@@ -194,19 +194,23 @@ const Product = {
 
   /**
    * RELACIONAR PRODUCTO CON ARTÍCULO - Para artículos "Top 10".
+   * MODIFICADO: Ahora usa UPSERT para evitar errores de duplicado
    * @param {string} articleId - UUID del artículo
    * @param {string} productId - UUID del producto
    * @param {string} reviewNotes - Notas específicas sobre este producto en el artículo
-   * @returns {Promise<Object>} La relación creado
+   * @returns {Promise<Object>} La relación creada o actualizada
    */
   async linkToArticle(articleId, productId, reviewNotes = '') {
     const { data, error } = await supabase
       .from('article_products')
-      .insert([{
+      .upsert({
         article_id: articleId,
         product_id: productId,
         review_notes: reviewNotes
-      }])
+      }, {
+        onConflict: 'article_id,product_id',  // Conflicto en la clave única compuesta
+        ignoreDuplicates: false  // Actualiza en lugar de ignorar
+      })
       .select()
       .single();
 
