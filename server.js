@@ -22,7 +22,10 @@ app.use(helmet({
 }));
 
 app.use(compression());
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://blog-laptops-gaming.onrender.com'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Middleware personalizado para headers de seguridad y cache
