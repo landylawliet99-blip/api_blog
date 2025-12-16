@@ -1,4 +1,4 @@
-// server.js - VERSIÓN COMPLETA CON SEO OPTIMIZATION
+// server.js - VERSIÓN COMPLETA CON MIDDLEWARE DE ERRORES JSON
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -28,6 +28,19 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// MIDDLEWARE PARA CAPTURAR ERRORES DE JSON MALFORMADO
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('Error de sintaxis JSON:', err.message);
+    return res.status(400).json({
+      success: false,
+      message: 'JSON malformado en la solicitud',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+  next();
+});
+
 // Middleware personalizado para headers de seguridad y cache
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -35,7 +48,6 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   
-  // Cache headers para archivos estáticos
   if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico)$/)) {
     res.setHeader('Cache-Control', 'public, max-age=31536000');
   } else {
@@ -51,65 +63,37 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
-console.log('✅ Conectado a Supabase');
 
 // ==================== IMPORTAR RUTAS MVC ====================
 const articleRoutes = require('./routes/articleRoutes');
 const productRoutes = require('./routes/productRoutes');
 const authRoutes = require('./routes/authRoutes');
 const publicRoutes = require('./routes/publicRoutes');
-const sitemapRoutes = require('./routes/sitemapRoutes'); // Nuevas rutas de SEO
+const sitemapRoutes = require('./routes/sitemapRoutes');
+const scrapeRoutes = require('./routes/scrapeRoutes');
 
 // ==================== USAR RUTAS MVC ====================
 app.use('/api', articleRoutes);
 app.use('/api', productRoutes);
 app.use('/api', authRoutes);
 app.use('/api/public', publicRoutes);
-app.use('/api', sitemapRoutes); // Rutas de sitemap, robots.txt, manifest.json
+app.use('/api', sitemapRoutes);
+app.use('/api', scrapeRoutes);
 
 // ==================== RUTAS DE PRUEBA Y HEALTH CHECK ====================
 app.get('/', (req, res) => {
   res.json({
-    message: '🚀 API del Blog de Laptops Gaming funcionando con MVC y SEO',
-    version: '1.1.0',
+    message: '🚀 API del Blog de Laptops Gaming',
+    version: '1.2.0',
+    features: ['MVC', 'SEO', 'Scraping', 'Afiliados', 'Autenticación'],
     endpoints: {
-      articles: {
-        create: 'POST /api/articles',
-        getAll: 'GET /api/articles',
-        getById: 'GET /api/articles/:id',
-        update: 'PUT /api/articles/:id',
-        delete: 'DELETE /api/articles/:id'
-      },
-      products: {
-        create: 'POST /api/products',
-        getAll: 'GET /api/products',
-        addLink: 'POST /api/products/:productId/links',
-        linkToArticle: 'POST /api/articles/:articleId/products'
-      },
-      auth: {
-        register: 'POST /api/auth/register',
-        login: 'POST /api/auth/login'
-      },
-      public: {
-        getArticles: 'GET /api/public/articles',
-        getArticle: 'GET /api/public/articles/:slug'
-      },
-      seo: {
-        sitemap: 'GET /api/sitemap.xml',
-        robots: 'GET /api/robots.txt',
-        manifest: 'GET /api/manifest.json'
-      }
-    },
-    seo_features: [
-      'Meta tags dinámicos',
-      'Sitemap XML automático',
-      'Robots.txt inteligente',
-      'Schema.org JSON-LD',
-      'Open Graph tags',
-      'Twitter Cards',
-      'Compresión GZIP',
-      'Headers de seguridad'
-    ]
+      articles: '/api/articles',
+      products: '/api/products',
+      auth: '/api/auth',
+      public: '/api/public',
+      seo: ['/api/sitemap.xml', '/api/robots.txt'],
+      scraping: '/api/scrape'
+    }
   });
 });
 
@@ -119,16 +103,11 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     database: 'connected',
     seo_enabled: true,
-    features: {
-      compression: true,
-      security_headers: true,
-      sitemap: true
-    }
+    scraping_enabled: true
   });
 });
 
 // ==================== RUTAS DE SEO DIRECTAS ====================
-// Estas rutas también pueden ser accedidas directamente (sin /api) para crawlers
 app.get('/sitemap.xml', (req, res) => {
   res.redirect('/api/sitemap.xml');
 });
@@ -142,54 +121,31 @@ app.get('/manifest.json', (req, res) => {
 });
 
 // ==================== MANEJO DE ERRORES ====================
-// Para rutas no encontradas
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Ruta no encontrada',
-    suggestion: 'Visita / para ver todos los endpoints disponibles'
+    message: 'Ruta no encontrada'
   });
 });
 
-// Manejador de errores general
 app.use((err, req, res, next) => {
-  console.error('❌ Error del servidor:', err.stack);
+  console.error('Error del servidor:', err.message);
+  
+  if (err.message.includes('Tienda no soportada') || err.message.includes('scraping')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Error en scraping: ' + err.message
+    });
+  }
+  
   res.status(500).json({
     success: false,
-    message: 'Error interno del servidor',
-    error: process.env.NODE_ENV === 'development' ? err.message : {}
+    message: 'Error interno del servidor'
   });
 });
 
 // ==================== INICIAR SERVIDOR ====================
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`
-===========================================
-🚀 SERVIDOR MVC CON SEO INICIADO
-📡 URL: http://localhost:${PORT}
-📊 Health: http://localhost:${PORT}/api/health
-📚 Docs: http://localhost:${PORT}
-===========================================
-  `);
-  console.log('📖 Rutas públicas:');
-  console.log('   http://localhost:3001/api/public/articles');
-  console.log('   http://localhost:3001/api/public/articles/:slug');
-  
-  console.log('\n🗺️  Herramientas SEO:');
-  console.log('   Sitemap: http://localhost:3001/api/sitemap.xml');
-  console.log('   Robots: http://localhost:3001/api/robots.txt');
-  console.log('   Manifest: http://localhost:3001/api/manifest.json');
-  
-  console.log('\n🔧 Configuración:');
-  console.log('   Compresión: ✅ Habilitada');
-  console.log('   Headers de seguridad: ✅ Habilitados');
-  console.log('   CORS: ✅ Habilitado');
-  console.log('   Supabase: ✅ Conectado');
-  
-  console.log('\n⚠️  RECUERDA: Cambia "tudominio.com" en:');
-  console.log('   - sitemapController.js');
-  console.log('   - MetaTags.js (opcional)');
-  console.log('   Cuando tengas tu dominio real en producción.');
-  console.log('===========================================\n');
+  console.log(`Servidor iniciado en http://localhost:${PORT}`);
 });
